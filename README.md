@@ -1,8 +1,8 @@
 # Photo Date Update
 
-Two Python scripts to batch-update the date metadata on image and video files using [ExifTool](https://exiftool.org).
+A set of Python scripts to manage, date, rename, and deduplicate image and video files using [ExifTool](https://exiftool.org).
 
-Useful for scanned photos, old imports, or any files where the date is wrong or missing.
+Useful for scanned photos, old imports, WhatsApp exports, or any files where the date is wrong, missing, or the filenames are inconsistent.
 
 ---
 
@@ -117,9 +117,88 @@ Files that don't match any supported format are skipped and listed at the end.
 
 ---
 
+### 3. `rename_to_exif.py` — Rename files to match their EXIF date
+
+Use this when files have inconsistent or wrong names but correct EXIF dates. Reads the `DateTimeOriginal` from each file and renames it to `YYYYMMDD_NNN.ext`. Numbering continues from whatever already exists in the folder for that date to avoid conflicts.
+
+```
+python rename_to_exif.py <folder> [options]
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Preview renames without applying them |
+| `--recursive` | Also process files in subfolders |
+
+**Examples:**
+
+```powershell
+# Preview renames
+python rename_to_exif.py "D:\Photos\2023" --dry-run
+
+# Apply renames
+python rename_to_exif.py "D:\Photos\2023"
+
+# Include subfolders
+python rename_to_exif.py "D:\Photos" --recursive --dry-run
+```
+
+Files with no EXIF date and files already correctly named are skipped and listed.
+
+---
+
+### 4. `find_duplicates.py` — Find and remove duplicate files
+
+Detects duplicate image/video files by content checksum. Two files with identical checksums are guaranteed to be the same file regardless of filename, date, or location.
+
+Works in two modes:
+
+**Single folder** — finds duplicates within one folder:
+```
+python find_duplicates.py <folder> [options]
+```
+
+**Two folder** — finds files in folder2 that already exist in folder1 (folder1 is the master and is never touched):
+```
+python find_duplicates.py <folder1> --compare <folder2> [options]
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Report duplicates without moving or deleting anything |
+| `--move PATH` | Move duplicates to this folder (recommended over --delete) |
+| `--delete` | Permanently delete duplicates |
+| `--compare PATH` | Second folder to compare against the first |
+| `--no-recursive` | Only scan top-level folder (default: recursive) |
+
+**Examples:**
+
+```powershell
+# Always preview first
+python find_duplicates.py "D:\Photos" --dry-run
+
+# Move duplicates to a review folder (safest)
+python find_duplicates.py "D:\Photos" --move "D:\Photos\duplicates"
+
+# Delete duplicates permanently
+python find_duplicates.py "D:\Photos" --delete
+
+# Compare two folders — only duplicates in Downloads are flagged
+python find_duplicates.py "D:\Photos\Master" --compare "D:\Photos\Downloads" --dry-run
+python find_duplicates.py "D:\Photos\Master" --compare "D:\Photos\Downloads" --move "D:\Photos\dupes"
+```
+
+When duplicates are found within a single folder, the file with the shortest/simplest name is kept.
+
+---
+
 ## What dates get updated
 
-Both scripts update the following metadata fields:
+`redate.py` and `redate_from_name.py` update the following metadata fields:
 
 | Field | Used by |
 |-------|---------|
@@ -241,6 +320,8 @@ The `--city` flag automatically sets the correct UTC offset including daylight s
 ## Tips
 
 - Always run with `--dry-run` first to preview changes before applying them
-- If a file fails due to a corrupted EXIF, open it in Paint, Save As a new file, then retry
+- Use `--move` instead of `--delete` the first time — safer to review before permanently removing files
+- If a file fails due to corrupted EXIF, open it in Paint, Save As a new file, then retry
 - `--tbc` only works together with `--rename`
 - City names are case-insensitive and spaces are ignored (`--city new york` and `--city newyork` both work)
+- Press **Ctrl+C** in PowerShell to stop a running script at any time
